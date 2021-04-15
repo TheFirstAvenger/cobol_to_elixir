@@ -1,6 +1,5 @@
 defmodule CobolToElixirTest do
-  use ExUnit.Case
-  import CobolToElixirCase
+  use CobolToElixirCase
 
   @moduletag timeout: 5000
 
@@ -30,7 +29,6 @@ defmodule CobolToElixirTest do
     assert expected_output == execute_cobol_code(cobol_text, input)
     # Next run our converter to generate Elixir code
     assert {:ok, elixir_code} = CobolToElixir.convert(cobol_text, accept_via_message: true)
-    IO.puts(elixir_code)
     # Now run that Elixir code, and ensure the outtput matches our expected output
     assert expected_output == execute_elixir_code(elixir_code, ElixirFromCobol.Test1, input)
 

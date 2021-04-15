@@ -70,10 +70,10 @@ defmodule CobolToElixir.Tokenizer do
     end
   end
 
-  defp maybe_to_zeros_or_spaces("ZEROS"), do: :zeros
   defp maybe_to_zeros_or_spaces("ZERO"), do: :zeros
-  defp maybe_to_zeros_or_spaces("SPACES"), do: :spaces
+  defp maybe_to_zeros_or_spaces("ZEROS"), do: :zeros
   defp maybe_to_zeros_or_spaces("SPACE"), do: :spaces
+  defp maybe_to_zeros_or_spaces("SPACES"), do: :spaces
   defp maybe_to_zeros_or_spaces(other), do: other
 
   def match_move_line("MOVE " <> move_line), do: split_vars_and_strings(move_line)

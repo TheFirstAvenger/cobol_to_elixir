@@ -60,8 +60,6 @@ defmodule CobolToElixir.Parser do
     }
   end
 
-  defp parse_division("DATA", nil, parsed), do: parsed
-
   defp parse_division("DATA", data, parsed) do
     data
     |> parse_sections()
@@ -109,9 +107,25 @@ defmodule CobolToElixir.Parser do
     end
 
     value =
-      case pic do
-        {:str, _, length} -> value |> String.slice(0..(length - 1)) |> String.pad_trailing(length)
-        _ -> IO.inspect(value, label: "other")
+      case {value, pic} do
+        {value, {:str, _, length}} when value in [nil, :spaces] ->
+          String.duplicate(" ", length)
+
+        {value, {:str, _, length}} ->
+          value |> trim_quotes() |> String.slice(0..(length - 1)) |> String.pad_trailing(length)
+
+        {value, {:int, _, _}} when value in [nil, :zeros] ->
+          0
+
+        {value, {:int, pic_str, length}} ->
+          if !is_nil(value) and String.length(value) > length do
+            raise "Variable #{name} has value #{value} which is larger than pic (#{pic_str}) allows"
+          end
+
+          value
+
+        _ ->
+          IO.inspect(value, label: "other")
       end
 
     %Variable{
@@ -127,6 +141,14 @@ defmodule CobolToElixir.Parser do
       value: value || constant,
       constant: !is_nil(constant)
     }
+  end
+
+  defp trim_quotes(str) do
+    cond do
+      String.starts_with?(str, "\"") && String.ends_with?(str, "\"") -> String.slice(str, 1..(String.length(str) - 2))
+      String.starts_with?(str, "'") && String.ends_with?(str, "'") -> String.slice(str, 1..(String.length(str) - 2))
+      true -> raise "String variable #{str} did not start and end with quotes"
+    end
   end
 
   defp parse_var_field([field, pic | rest], field), do: {pic, rest}

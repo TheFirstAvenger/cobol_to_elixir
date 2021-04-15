@@ -10,6 +10,11 @@ defmodule CobolToElixir do
     File.write!(output_file, elixir)
   end
 
+  def convert!(contents, opts \\ []) do
+    {:ok, elixir} = convert(contents, opts)
+    elixir
+  end
+
   def convert(contents, opts \\ []) do
     {:ok, tokenized} = Tokenizer.tokenize(contents)
     # IO.inspect(tokenized)

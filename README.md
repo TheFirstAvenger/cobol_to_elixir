@@ -8,7 +8,10 @@ Roadmap:
     - [x] Author -> Note in Moduledoc
     - [x] Date-Written -> Note in Moduledoc
   - Working-Storage Section
-    - [x] Parse Variable
+    - [x] Parse String Variable
+    - [x] Parse Simple Number Variable
+    - [ ] Parse Complex Number Variable
+    - [ ] Parse Data Structure (nested maps)
   - File Access
     - [ ] Parse file-control
     - [ ] Parse file section
@@ -19,6 +22,10 @@ Roadmap:
     - [x] Display
     - [x] Accept
     - [x] Move
+    - [ ] Compute
+    - [ ] If/Else
+    - [ ] Internal Subroutines (Perform)
+    - [ ] External Subroutines (Call)
 - Testing Framework
   - [x] Compile and execute COBOL code
   - [x] Compile and execute Elixir code

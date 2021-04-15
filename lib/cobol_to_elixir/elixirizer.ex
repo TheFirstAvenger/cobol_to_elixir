@@ -13,8 +13,8 @@ defmodule CobolToElixir.Elixirizer do
       [
         ~s|defmodule #{namespace}.#{module_name} do|,
         ~s|  @moduledoc """|,
-        ~s|  author: #{Map.get(parsed, :author, "n/a")}|,
-        ~s|  date written: #{Map.get(parsed, :date_written, "n/a")}|,
+        ~s|  author: #{parsed.author || "n/a"}|,
+        ~s|  date written: #{parsed.date_written || "n/a"}|,
         ~s|  """|,
         ~s||,
         ~s|  def main do|,
@@ -81,22 +81,14 @@ defmodule CobolToElixir.Elixirizer do
   end
 
   def variable_to_line(%Variable{pic: pic, value: value} = variable) do
-    value_str =
-      case value do
-        nil -> " = nil"
-        :zeros -> " = 0"
-        :spaces -> ~s| = "#{String.duplicate(" ", pic_length(pic))}"|
-        _ -> " = #{variable.value}"
-      end
-
     [
       ~s|    # pic: #{pic_str(pic)}|,
-      ~s|    #{variable_name(variable)}#{value_str}|
+      ~s|    #{variable_name(variable)} = #{maybe_parens(value, pic)}|
     ]
   end
 
-  defp pic_length({:repeat, _, _, length}), do: length
-  defp pic_length({:static, pic}), do: String.length(pic)
+  defp maybe_parens(val, {:str, _, _}), do: ~s|"#{val}"|
+  defp maybe_parens(val, _), do: val
 
   defp pic_str(nil), do: "none"
   defp pic_str(pic), do: elem(pic, 1)
