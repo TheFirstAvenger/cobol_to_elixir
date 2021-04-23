@@ -4,6 +4,7 @@ defmodule CobolToElixir.Parsed do
             date_written: nil,
             divisions: [],
             procedure: [],
+            paragraphs: %{},
             variables: [],
             variable_map: %{}
 end

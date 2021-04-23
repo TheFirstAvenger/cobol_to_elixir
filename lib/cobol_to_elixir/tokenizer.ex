@@ -28,6 +28,7 @@ defmodule CobolToElixir.Tokenizer do
       variable_line = match_variable_line(line) -> {:variable_line, variable_line}
       move_line = match_move_line(line) -> {:move_line, move_line}
       simple = match_simple(line) -> simple
+      paragraph = match_paragraph(line) -> {:paragraph, paragraph}
       true -> {:not_tokenized, warn_not_tokenized(line)}
     end
   end
@@ -70,6 +71,14 @@ defmodule CobolToElixir.Tokenizer do
     end
   end
 
+  defp match_paragraph(line) do
+    if Regex.match?(~r/^[a-z\-A-Z0-9]+$/, line) do
+      line
+    else
+      false
+    end
+  end
+
   defp maybe_to_zeros_or_spaces("ZERO"), do: :zeros
   defp maybe_to_zeros_or_spaces("ZEROS"), do: :zeros
   defp maybe_to_zeros_or_spaces("SPACE"), do: :spaces
@@ -85,8 +94,6 @@ defmodule CobolToElixir.Tokenizer do
     |> List.flatten()
   end
 
-  def to_vars_and_strings(str) when is_binary(str), do: str |> split_vars_and_strings() |> to_vars_and_strings()
-
   def to_vars_and_strings(["\"" <> string | tail]),
     do: [{:string, String.trim_trailing(string, "\"")} | to_vars_and_strings(tail)]
 
@@ -99,8 +106,16 @@ defmodule CobolToElixir.Tokenizer do
   defp match_simple("DISPLAY " <> display), do: parse_display(display)
   defp match_simple("ACCEPT " <> accept), do: {:accept, accept}
   defp match_simple("COMPUTE " <> compute), do: {:compute, compute}
+  defp match_simple("PERFORM " <> perform), do: {:perform, parse_perform(perform)}
   defp match_simple("STOP RUN"), do: {:stop, :run}
   defp match_simple(_), do: false
+
+  defp parse_perform(perform) do
+    case String.split(perform, " ") do
+      [name] -> {:repeat, 1, name}
+      [name, x, "TIMES"] -> {:repeat, String.to_integer(x), name}
+    end
+  end
 
   defp parse_display(display) do
     {advancing, display} = do_parse_display([], split_vars_and_strings(display))

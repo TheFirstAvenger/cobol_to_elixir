@@ -48,9 +48,14 @@ defmodule CobolToElixir.Parser do
     {author, identification} = Keyword.pop(identification, :author)
     {date_written, identification} = Keyword.pop(identification, :date_written)
 
-    if identification != [] do
-      Logger.warn("Unparsed identification: #{inspect(Keyword.keys(identification))}")
+    # coveralls-ignore-start
+    case identification do
+      [] -> :ok
+      [{:not_tokenized, _}] -> :ok
+      _ -> Logger.warn("Unparsed identification: #{inspect(Keyword.keys(identification))}")
     end
+
+    # coveralls-ignore-end
 
     %Parsed{
       parsed
@@ -69,16 +74,39 @@ defmodule CobolToElixir.Parser do
   end
 
   defp parse_division("PROCEDURE", procedure, %Parsed{} = parsed) do
-    %Parsed{parsed | procedure: procedure}
+    {procedure, paragraphs, remaining} =
+      Enum.reduce(procedure, {[], %{}, nil}, fn
+        {:paragraph, paragraph_name}, {procedure, paragraphs, nil} ->
+          if Map.has_key?(paragraphs, paragraph_name), do: raise("Multiple paragraphs found named #{paragraph_name}")
+          {[{:perform_paragraph, paragraph_name} | procedure], paragraphs, {paragraph_name, []}}
+
+        {:paragraph, new_paragraph_name}, {procedure, paragraphs, {paragraph_name, lines}} ->
+          if Map.has_key?(paragraphs, new_paragraph_name),
+            do: raise("Multiple paragraphs found named #{new_paragraph_name}")
+
+          {[{:perform_paragraph, new_paragraph_name} | procedure],
+           Map.put(paragraphs, paragraph_name, Enum.reverse(lines)), {new_paragraph_name, []}}
+
+        line, {procedure, paragraphs, nil} ->
+          {[line | procedure], paragraphs, nil}
+
+        line, {procedure, paragraphs, {paragraph_name, lines}} ->
+          {procedure, paragraphs, {paragraph_name, [line | lines]}}
+      end)
+
+    paragraphs =
+      case remaining do
+        nil -> paragraphs
+        {paragraph_name, lines} -> Map.put(paragraphs, paragraph_name, Enum.reverse(lines))
+      end
+
+    %Parsed{parsed | procedure: Enum.reverse(procedure), paragraphs: paragraphs}
   end
 
   defp parse_division(name, _contents, parsed) do
     Logger.warn("No parser for division #{name}")
     parsed
   end
-
-  defp parse_data_section("FILE", [], parsed), do: parsed
-  defp parse_data_section("WORKING-STORAGE", [], parsed), do: parsed
 
   defp parse_data_section("WORKING-STORAGE", contents, parsed) do
     all_variables =
@@ -103,7 +131,9 @@ defmodule CobolToElixir.Parser do
     {constant, rest} = parse_var_field(rest, :constant)
 
     if rest != [] do
+      # coveralls-ignore-start
       Logger.warn("Variable contained unexpected values: #{inspect(rest)}. Full variable: #{inspect(line)}")
+      # coveralls-ignore-end
     end
 
     value =

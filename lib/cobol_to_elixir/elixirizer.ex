@@ -27,6 +27,7 @@ defmodule CobolToElixir.Elixirizer do
         ~s||
       ] ++
         do_main_function(parsed) ++
+        do_paragraphs(parsed) ++
         [
           ~s||,
           ~s|  defp do_accept() do|
@@ -70,6 +71,14 @@ defmodule CobolToElixir.Elixirizer do
       [
         ~s|  end|
       ]
+  end
+
+  def do_paragraphs(%Parsed{paragraphs: paragraphs} = parsed) do
+    Enum.flat_map(paragraphs, &do_paragraph(&1, parsed))
+  end
+
+  defp do_paragraph({name, lines}, parsed) do
+    [~s||, ~s|  def paragraph_#{name} do|] ++ procedure(%Parsed{parsed | procedure: lines}) ++ [~s|  end|]
   end
 
   def variables(%Parsed{variables: variables}) do
@@ -120,16 +129,21 @@ defmodule CobolToElixir.Elixirizer do
   defp procedure_to_line({:move_line, [val, "TO", var]}, %Parsed{variable_map: m}),
     do: [~s|    #{variable_name(var)} = format(#{val}, #{inspect(m[var].pic)})|]
 
+  defp procedure_to_line({:perform_paragraph, paragraph_name}, _),
+    do: [~s|    paragraph_#{paragraph_name}()|]
+
+  defp procedure_to_line({:perform, {:repeat, x, paragraph_name}}, _),
+    do: List.duplicate(~s|    paragraph_#{paragraph_name}()|, x)
+
   defp procedure_to_line(other, _) do
+    # coveralls-ignore-start
     Logger.warn("No procedure_to_line for #{inspect(other)}")
     []
+    # coveralls-ignore-end
   end
 
-  defp display_vars_and_strings([{:variable, %Variable{pic: {:str, _, _}} = var} | rest]),
-    do: [~s|"\#{#{variable_name(var)}}"| | display_vars_and_strings(rest)]
-
   defp display_vars_and_strings([{:variable, var} | rest]),
-    do: [~s|"\#{#{variable_name(var)}}"| | display_vars_and_strings(rest)]
+    do: [variable_name(var) | display_vars_and_strings(rest)]
 
   defp display_vars_and_strings([{:string, str} | rest]),
     do: [~s|"#{str}"| | display_vars_and_strings(rest)]

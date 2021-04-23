@@ -24,7 +24,7 @@ Roadmap:
     - [x] Move
     - [ ] Compute
     - [ ] If/Else
-    - [ ] Internal Subroutines (Perform)
+    - [x] Internal Subroutines (Perform)
     - [ ] External Subroutines (Call)
 - Testing Framework
   - [x] Compile and execute COBOL code

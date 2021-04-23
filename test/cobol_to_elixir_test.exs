@@ -1,10 +1,40 @@
 defmodule CobolToElixirTest do
   use CobolToElixirCase
 
-  @moduletag timeout: 5000
+  @moduletag timeout: 10000
+
+  test "convert_file!/2" do
+    tmp_folder = Path.relative_to_cwd("test/temp_delete_contents/#{Enum.random(1000..1_000_000_000_000)}")
+
+    try do
+      File.mkdir_p!(tmp_folder)
+
+      cobol_text = """
+              >>SOURCE FORMAT FREE
+      IDENTIFICATION DIVISION.
+      PROGRAM-ID. test1.
+      AUTHOR. Mike Binns.
+      DATE-WRITTEN.March 19th 2021
+      DATA DIVISION.
+      WORKING-STORAGE SECTION.
+      01 NAME PIC X(5).
+      PROCEDURE DIVISION.
+      STOP RUN.
+      """
+
+      cobol_file = Path.join(tmp_folder, "cobol.cob")
+      elixir_file = Path.join(tmp_folder, "module.ex")
+      File.write!(cobol_file, cobol_text)
+      CobolToElixir.convert_file!(cobol_file, elixir_file)
+      elixir_text = File.read!(elixir_file)
+      assert elixir_text =~ "defmodule ElixirFromCobol.Test1"
+    after
+      File.rm_rf!(tmp_folder)
+    end
+  end
 
   test "validate testing framework" do
-    cobol_text = """
+    cobol = """
            >>SOURCE FORMAT FREE
     IDENTIFICATION DIVISION.
     PROGRAM-ID. test1.
@@ -23,16 +53,21 @@ defmodule CobolToElixirTest do
 
     """
 
+    validate_cobol_code(cobol)
+
     input = [{1000, "John"}]
     expected_output = "Hello Mike \nHello John \nHello John "
     # First verify our cobol code runs and returns the right value
-    assert expected_output == execute_cobol_code(cobol_text, input)
+    assert expected_output == execute_cobol_code!(cobol, input)
     # Next run our converter to generate Elixir code
-    assert {:ok, elixir_code} = CobolToElixir.convert(cobol_text, accept_via_message: true)
+    assert {:ok, elixir_code} = CobolToElixir.convert(cobol, accept_via_message: true)
     # Now run that Elixir code, and ensure the outtput matches our expected output
     assert expected_output == execute_elixir_code(elixir_code, ElixirFromCobol.Test1, input)
 
     # The below code is a one liner version of all of the above commands. Lets make sure that works too.
-    assert_output_equal(cobol_text, ElixirFromCobol.Test1, expected_output, input)
+    assert_output_equal(cobol, ElixirFromCobol.Test1, expected_output, input)
+
+    # make sure validate_cobol_code raises on bad cobol
+    assert_raise RuntimeError, ~r/^Error compiling cobol:/, fn -> validate_cobol_code("some bad code") end
   end
 end

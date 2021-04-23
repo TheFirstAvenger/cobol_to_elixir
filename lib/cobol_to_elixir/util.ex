@@ -1,14 +1,9 @@
 defmodule CobolToElixir.Util do
-  def execute_cobol_code(cobol, input \\ []) do
-    tmp_folder = Path.relative_to_cwd("test/temp/#{Enum.random(1000..1_000_000_000_000)}")
+  def execute_cobol_code!(cobol, input \\ []) do
+    tmp_folder = generate_tmp_folder()
 
     try do
-      File.mkdir_p!(tmp_folder)
-      cobol_path = Path.join(tmp_folder, "cobol.cob")
-      cobol_executable_path = Path.join(tmp_folder, "cobol")
-      File.write(cobol_path, cobol)
-
-      case System.cmd("cobc", ["-x", "-o", cobol_executable_path, cobol_path], stderr_to_stdout: true) do
+      case compile_cobol(cobol, tmp_folder) do
         {"", 0} -> :ok
         {output, 1} -> raise "Error compiling cobol:\n#{output}"
       end
@@ -27,13 +22,29 @@ defmodule CobolToElixir.Util do
     end
   end
 
+  def compile_cobol(code, tmp_folder) do
+    cobol_path = Path.join(tmp_folder, "cobol.cob")
+    cobol_executable_path = Path.join(tmp_folder, "cobol")
+    File.write(cobol_path, code)
+    System.cmd("cobc", ["-x", "-o", cobol_executable_path, cobol_path], stderr_to_stdout: true)
+  end
+
+  def generate_tmp_folder do
+    tmp_folder = Path.relative_to_cwd("test/temp_delete_contents/#{Enum.random(1000..1_000_000_000_000)}")
+    File.mkdir_p!(tmp_folder)
+    tmp_folder
+  end
+
   defp get_cobol_output(port, acc \\ []) do
+    # coveralls-ignore-start
     receive do
       {^port, {:data, output}} -> get_cobol_output(port, [output | acc])
       {^port, {:closed}} -> acc
       {^port, {:exit_status, 0}} -> acc
       other -> raise "got unexpected port response: #{inspect(other)}"
     end
+
+    # coveralls-ignore-end
   end
 
   defp send_cobol_input(_port, []), do: :ok

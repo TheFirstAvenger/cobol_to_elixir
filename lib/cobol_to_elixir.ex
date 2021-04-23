@@ -3,10 +3,9 @@ defmodule CobolToElixir do
   alias CobolToElixir.Parser
   alias CobolToElixir.Elixirizer
 
-  def convert_file(cobol_file, output_file) do
+  def convert_file!(cobol_file, output_file) do
     contents = File.read!(cobol_file)
     {:ok, elixir} = convert(contents)
-    IO.puts(elixir)
     File.write!(output_file, elixir)
   end
 
