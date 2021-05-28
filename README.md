@@ -11,7 +11,7 @@ Roadmap:
     - [x] Parse String Variable
     - [x] Parse Simple Number Variable
     - [ ] Parse Complex Number Variable
-    - [ ] Parse Data Structure (nested maps)
+    - [x] Parse Group Items (nested maps)
   - File Access
     - [ ] Parse file-control
     - [ ] Parse file section
@@ -20,8 +20,13 @@ Roadmap:
   - Procedure Division
     - [x] Initialize Variables
     - [x] Display
+      - [x] String
+      - [x] Simple Variable
+      - [x] Group Item (nested map)
     - [x] Accept
-    - [x] Move
+    - [ ] Move
+      - [x] Into Simple Variable
+      - [ ] Into Group Items
     - [ ] Compute
     - [ ] If/Else
     - [x] Internal Subroutines (Perform)

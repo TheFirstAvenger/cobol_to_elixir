@@ -79,12 +79,13 @@ defmodule CobolToElixirCase do
   """
   def assert_output_equal(cobol_text, module, output \\ "", input \\ []) do
     cobol_output = execute_cobol_code!(cobol_text, input)
-    {:ok, elixir_text} = CobolToElixir.convert(cobol_text, accept_via_message: true)
-    elixir_output = execute_elixir_code(elixir_text, module, input)
-    ExUnit.Assertions.assert(cobol_output == elixir_output)
 
     if !is_nil(output) do
       ExUnit.Assertions.assert(cobol_output == output)
     end
+
+    {:ok, elixir_text} = CobolToElixir.convert(cobol_text, accept_via_message: true)
+    elixir_output = execute_elixir_code(elixir_text, module, input)
+    ExUnit.Assertions.assert(cobol_output == elixir_output)
   end
 end

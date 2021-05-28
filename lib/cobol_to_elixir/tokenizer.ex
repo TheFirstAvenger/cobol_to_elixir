@@ -55,20 +55,24 @@ defmodule CobolToElixir.Tokenizer do
   def match_variable_line(line) do
     case split_vars_and_strings(line) do
       [level, variable] when level in @two_integers_as_strings ->
-        [level, variable]
+        [tokenize_level(level), variable]
 
       [level, variable, "PIC", picture_clause] when level in @two_integers_as_strings ->
-        [level, variable, :pic, picture_clause]
+        [tokenize_level(level), variable, {:pic, picture_clause}]
 
       [level, variable, "PIC", picture_clause, "VALUE", value] when level in @two_integers_as_strings ->
-        [level, variable, :pic, picture_clause, :value, maybe_to_zeros_or_spaces(value)]
+        [tokenize_level(level), variable, {:pic, picture_clause}, {:value, maybe_to_zeros_or_spaces(value)}]
 
       [level, variable, "CONSTANT", "AS", value] when level in @two_integers_as_strings ->
-        [level, variable, :constant, value]
+        [tokenize_level(level), variable, :constant, {:value, value}]
 
       _ ->
         false
     end
+  end
+
+  defp tokenize_level(level) do
+    {:level, String.to_integer(level)}
   end
 
   defp match_paragraph(line) do

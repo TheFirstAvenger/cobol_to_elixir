@@ -77,7 +77,9 @@ defmodule CobolToElixir.Parser do
     {procedure, paragraphs, remaining} =
       Enum.reduce(procedure, {[], %{}, nil}, fn
         {:paragraph, paragraph_name}, {procedure, paragraphs, nil} ->
-          if Map.has_key?(paragraphs, paragraph_name), do: raise("Multiple paragraphs found named #{paragraph_name}")
+          if Map.has_key?(paragraphs, paragraph_name),
+            do: raise("Multiple paragraphs found named #{paragraph_name}")
+
           {[{:perform_paragraph, paragraph_name} | procedure], paragraphs, {paragraph_name, []}}
 
         {:paragraph, new_paragraph_name}, {procedure, paragraphs, {paragraph_name, lines}} ->
@@ -109,30 +111,114 @@ defmodule CobolToElixir.Parser do
   end
 
   defp parse_data_section("WORKING-STORAGE", contents, parsed) do
+    {variable_lines, other} = Enum.split_with(contents, &(elem(&1, 0) == :variable_line))
+
+    if other != [] do
+      Logger.warn("Unknown lines in WORKING-STORAGE: #{inspect(other)}")
+    end
+
     all_variables =
-      contents
-      |> Enum.filter(&(elem(&1, 0) == :variable_line))
-      |> Enum.map(fn {:variable_line, line} ->
+      Enum.map(variable_lines, fn {:variable_line, line} ->
         variable_line_to_variable(line)
       end)
 
-    variable_map =
-      all_variables
-      |> Enum.map(fn %Variable{name: name} = var -> {name, var} end)
-      |> Enum.into(%{})
+    {variables, variable_map, _depth_list} =
+      Enum.reduce(all_variables, {[], %{}, []}, fn %Variable{depth: depth} = variable,
+                                                   {variables, variable_map, depth_list} ->
+        depth_list = prune_depth_list(depth_list, depth)
 
-    %Parsed{parsed | variables: all_variables, variable_map: variable_map}
+        depth_vars = Enum.map(depth_list, &elem(&1, 0))
+
+        case {depth_list, variable.type} do
+          {[], :single} ->
+            {[variable | variables], Map.put(variable_map, variable.name, variable), []}
+
+          {[], :map} ->
+            {[%Variable{variable | value: %{}} | variables], Map.put(variable_map, variable.name, variable),
+             [{variable.name, depth}]}
+
+          {[_], :single} ->
+            parent = hd(variables)
+
+            parent = %Variable{
+              parent
+              | value: Map.put(parent.value, variable.name, variable.value),
+                children: parent.children ++ [depth_vars ++ [variable.name]]
+            }
+
+            child = %Variable{variable | value: depth_vars, type: :map_child}
+            {[parent | tl(variables)], Map.put(variable_map, child.name, child), depth_list}
+
+          {[_], :map} ->
+            parent = hd(variables)
+
+            parent = %Variable{
+              parent
+              | value: Map.put(parent.value, variable.name, variable.value)
+            }
+
+            child = %Variable{variable | value: depth_vars, type: :map_child_map}
+
+            {[parent | tl(variables)], Map.put(variable_map, child.name, child), depth_list ++ [{variable.name, depth}]}
+
+          {[_ | path], type} ->
+            child_type =
+              if type == :single do
+                :map_child
+              else
+                :map_child_map
+              end
+
+            child = %Variable{variable | value: depth_vars, type: child_type}
+
+            parent = hd(variables)
+
+            children =
+              case type do
+                :map -> parent.children
+                :single -> parent.children ++ [depth_vars ++ [variable.name]]
+              end
+
+            parent = %Variable{
+              parent
+              | value: put_in(parent.value, Enum.map(path, &elem(&1, 0)) ++ [variable.name], variable.value),
+                children: children
+            }
+
+            {[parent | tl(variables)], Map.put(variable_map, child.name, child), depth_list}
+
+          {_, _} ->
+            {variables, variable_map, depth_list}
+        end
+      end)
+
+    variable_map =
+      Enum.reduce(variables, variable_map, fn %{name: name} = var, variable_map ->
+        Map.put(variable_map, name, var)
+      end)
+
+    %Parsed{parsed | variables: Enum.reverse(variables), variable_map: variable_map}
+  end
+
+  defp prune_depth_list([], _), do: []
+
+  defp prune_depth_list(list, depth) do
+    case List.pop_at(list, -1) do
+      {{_, d}, rest} when d >= depth -> prune_depth_list(rest, depth)
+      _ -> list
+    end
   end
 
   defp variable_line_to_variable([depth, name | rest] = line) do
     {pic, rest} = parse_var_field(rest, :pic)
     pic = parse_pic(pic)
     {value, rest} = parse_var_field(rest, :value)
-    {constant, rest} = parse_var_field(rest, :constant)
+    constant = :constant in rest
 
     if rest != [] do
       # coveralls-ignore-start
       Logger.warn("Variable contained unexpected values: #{inspect(rest)}. Full variable: #{inspect(line)}")
+
       # coveralls-ignore-end
     end
 
@@ -154,35 +240,50 @@ defmodule CobolToElixir.Parser do
 
           value
 
+        {nil, nil} ->
+          nil
+
         _ ->
-          IO.inspect(value, label: "other")
+          Logger.warn(label: "unexpected variable_line_to_variable: #{inspect(line)}")
+          value
       end
 
     %Variable{
       depth: depth,
       name: name,
       type:
-        if is_nil(pic) and is_nil(constant) and is_nil(value) do
+        if is_nil(pic) and !constant and is_nil(value) do
           :map
         else
           :single
         end,
       pic: pic,
-      value: value || constant,
-      constant: !is_nil(constant)
+      value: value || constant || %{},
+      constant: constant
     }
   end
 
   defp trim_quotes(str) do
     cond do
-      String.starts_with?(str, "\"") && String.ends_with?(str, "\"") -> String.slice(str, 1..(String.length(str) - 2))
-      String.starts_with?(str, "'") && String.ends_with?(str, "'") -> String.slice(str, 1..(String.length(str) - 2))
-      true -> raise "String variable #{str} did not start and end with quotes"
+      String.starts_with?(str, "\"") && String.ends_with?(str, "\"") ->
+        String.slice(str, 1..(String.length(str) - 2))
+
+      String.starts_with?(str, "'") && String.ends_with?(str, "'") ->
+        String.slice(str, 1..(String.length(str) - 2))
+
+      true ->
+        raise "String variable #{str} did not start and end with quotes"
     end
   end
 
-  defp parse_var_field([field, pic | rest], field), do: {pic, rest}
-  defp parse_var_field(rest, _), do: {nil, rest}
+  defp parse_var_field(var, field) do
+    var
+    |> Enum.split_with(&match?({^field, _}, &1))
+    |> case do
+      {[{^field, val}], rest} -> {val, rest}
+      {[], rest} -> {nil, rest}
+    end
+  end
 
   defp parse_pic(nil), do: nil
 
