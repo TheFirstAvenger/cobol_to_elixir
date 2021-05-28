@@ -161,8 +161,32 @@ defmodule CobolToElixir.Elixirizer do
 
   defp procedure_to_line({:stop, :run}, _), do: [~s|    throw :stop_run|]
 
-  defp procedure_to_line({:move_line, [val, "TO", var]}, %Parsed{variable_map: m}),
-    do: [~s|    #{variable_name(var)} = format(#{val}, #{inspect(m[var].pic)})|]
+  defp procedure_to_line({:move_line, commands}, %Parsed{variable_map: m}) do
+    {var, from} =
+      commands
+      |> Enum.reverse()
+      |> then(fn [var, "TO" | rest] ->
+        {var, Enum.reverse(rest)}
+      end)
+
+    val =
+      case from do
+        [v] -> v
+        _ -> raise "Move from something other than a single value not currently supported"
+      end
+
+    case Map.fetch!(m, var) do
+      %Variable{type: :single} ->
+        [~s|    #{variable_name(var)} = format(#{val}, #{inspect(m[var].pic)})|]
+
+      %Variable{type: :map_child, value: child_path} ->
+        path = tl(child_path) ++ [var]
+
+        [
+          ~s|    #{variable_name(hd(child_path))} = put_in(#{variable_name(hd(child_path))}, #{inspect(path)}, format(#{val}, #{inspect(m[var].pic)}))|
+        ]
+    end
+  end
 
   defp procedure_to_line({:perform_paragraph, paragraph_name}, _),
     do: [~s|    paragraph_#{paragraph_name}()|]

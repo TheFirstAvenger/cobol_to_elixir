@@ -132,26 +132,32 @@ defmodule CobolToElixir.DataDivision.GroupItemsTest do
     assert_output_equal(cobol, ElixirFromCobol.Test1, expected_output)
   end
 
-  # test "renders a move into a map child" do
-  #   cobol = """
-  #           >>SOURCE FORMAT FREE
-  #   IDENTIFICATION DIVISION.
-  #   PROGRAM-ID. test1.
-  #   DATA DIVISION.
-  #   WORKING-STORAGE SECTION.
-  #   01 Customer.
-  #     02 IDENT PIC 9(3).
-  #     02 CustName PIC X(5).
-  #     02 DateOfBirth.
-  #         03 MOB PIC 99.
-  #         03 DOB PIC 99.
-  #         03 YOB PIC 9(4).
-  #     02 Title PIC X(4).
-  #   01 Title PIC X(4).
-  #   PROCEDURE DIVISION.
+  test "renders a move into a map child" do
+    cobol = """
+            >>SOURCE FORMAT FREE
+    IDENTIFICATION DIVISION.
+    PROGRAM-ID. test1.
+    DATA DIVISION.
+    WORKING-STORAGE SECTION.
+    01 Customer.
+      02 IDENT PIC 9(3) VALUE 042.
+      02 CustName PIC X(5) VALUE "MIKEB".
+      02 DateOfBirth.
+          03 MOB PIC 99 VALUE 1.
+          03 DOB PIC 99 VALUE 2.
+          03 YOB PIC 9(4) VALUE 1982.
+      02 Title PIC X(3) VALUE "SSE".
+    PROCEDURE DIVISION.
+    DISPLAY "Customer: " Customer.
+    MOVE "JOHND" TO CustName
+    MOVE 1945 TO YOB
+    DISPLAY "Customer: " Customer.
+    """
 
-  #   """
+    validate_cobol_code(cobol)
 
-  #   validate_cobol_code(cobol)
-  # end
+    expected_output = "Customer: 042MIKEB01021982SSE\nCustomer: 042JOHND01021945SSE\n"
+
+    assert_output_equal(cobol, ElixirFromCobol.Test1, expected_output)
+  end
 end

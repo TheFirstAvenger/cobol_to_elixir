@@ -26,7 +26,7 @@ Roadmap:
     - [x] Accept
     - [ ] Move
       - [x] Into Simple Variable
-      - [ ] Into Group Items
+      - [x] Into Group Items
     - [ ] Compute
     - [ ] If/Else
     - [x] Internal Subroutines (Perform)
