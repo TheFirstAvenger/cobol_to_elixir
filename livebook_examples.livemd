@@ -1,0 +1,172 @@
+# CobolToElixir
+
+## Installing CobolToElixir
+
+COBOL is not technically necessary to run CobolToElixir, but the examples below do use it to verify expected output. You can install it with `brew install gnu-cobol` (this may take a while, run outside of Livebook instead to see progress).
+
+```elixir
+{_, 0} = System.cmd("brew", ["install", "gnu-cobol"], stderr_to_stdout: true)
+```
+
+Verify it installed correctly by running the COBOL Compiler `cobc`:
+
+```elixir
+{"GnuCOBOL" <> _, 0} = System.cmd("cobc", ["-h"], stderr_to_stdout: true)
+```
+
+Next, add `:cobol_to_elixir`. In a project, add this line to your dependencies:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:cobol_to_elixir, "~> 0.0.0"}
+```
+
+In this Livebook, we can install using `Mix.install`
+
+```elixir
+:ok =
+  Mix.install([
+    {:cobol_to_elixir,
+     git: "git@github.com:TheFirstAvenger/cobol_to_elixir.git",
+     ref: "ad918c91b5b6cef054ad1489c871c6620896e42e"}
+  ])
+```
+
+## Convert a simple COBOL program
+
+Lets start with a simple COBOL program to Elixir. This program has one variable set, and displays that variable:
+
+```elixir
+cobol = """
+       >>SOURCE FORMAT FREE
+IDENTIFICATION DIVISION.
+PROGRAM-ID. Livebook1.
+AUTHOR. Mike Binns.
+DATE-WRITTEN. June 25th 2021
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 Name     PIC X(4) VALUE "Mike".
+PROCEDURE DIVISION.
+
+DISPLAY "Hello " Name
+
+STOP RUN.
+"""
+```
+
+Now, lets validate that this is correct COBOL by compiling and then executing it using `CobolToElixir.Util.execute_cobol_code!/2`
+
+```elixir
+"Hello Mike\n" = cobol_output = CobolToElixir.Util.execute_cobol_code!(cobol)
+```
+
+Next, let's use `CobolToElixir.convert()` to convert the COBOL code to Elixir:
+
+```elixir
+elixir_code = CobolToElixir.convert!(cobol)
+IO.puts(elixir_code)
+```
+
+There is a bunch of boilerplate helper functions, but notice that the Module is named `ElixirFromCobol.Livebook1`, the author and date written are added to the @moduledoc, and that the `do_main` function contains the Elixir version of our COBOL working storage section and procedure division:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule ElixirFromCobol.Livebook1 do
+  @moduledoc """
+  author: Mike Binns
+  date written: June 25th 2021
+  """
+
+  ...
+
+  def do_main do
+    # pic: XXXX
+    var_Name = "Mike"
+    pics = %{"Name" => {:str, "XXXX", 4}}
+    IO.puts "Hello " <> var_Name
+    throw :stop_run
+  end
+```
+
+Next, lets try running that Elixir code. We will define a local function to compile the give Elixir code, load it into memory, run the `main` function, and then unload the code from memory. We will then run that function with the Elixir code output from our CobolToElixir transpiler.
+
+```elixir
+execute_elixir = fn elixir_code, module ->
+  Code.compile_string(elixir_code)
+  {:module, ^module} = Code.ensure_loaded(module)
+
+  apply(module, :main, [])
+
+  true = :code.delete(module)
+  :code.purge(module)
+  :ok
+end
+
+execute_elixir.(elixir_code, ElixirFromCobol.Livebook1)
+```
+
+Note that there was a compiler warning because we defined `pics` but did not use it. More advanced code conversions will use this variable.
+
+Also notice that `Hello Mike` appears in the logs.
+
+## Additional Examples - Paragraphs
+
+COBOL uses "paragraphs", which are similar to functions, but not exactly the same. Below we can see how a more complex COBOL program, with multiple paragraphs calling into each other, is converted to Elixir.
+
+First, lets define the Cobol code
+
+```elixir
+cobol = """
+       >>SOURCE FORMAT FREE
+IDENTIFICATION DIVISION.
+PROGRAM-ID. proceduretest.
+AUTHOR. Mike Binns.
+DATE-WRITTEN.March 19th 2021.
+PROCEDURE DIVISION.
+SubOne.
+  DISPLAY "In Paragraph 1"
+  PERFORM SubTwo
+  DISPLAY "Returned to Paragraph 1"
+  PERFORM SubFour 2 TIMES.
+  STOP RUN.
+
+SubThree.
+  DISPLAY "In Paragraph 3".
+
+SubTwo.
+  DISPLAY "In Paragraph 2"
+  PERFORM SubThree
+  DISPLAY "Returned to Paragraph 2".
+
+SubFour.
+  DISPLAY "Repeat".
+
+STOP RUN.
+
+"""
+```
+
+Next, we execute that COBOL code to verify it is valid, and to determine the expected output
+
+```elixir
+cobol_output = CobolToElixir.Util.execute_cobol_code!(cobol)
+IO.puts(cobol_output)
+```
+
+Now, lets convert that COBOL to Elixir. Note the contents of the `do_main` function, and the other functions that were created to mirror the paragraphs.
+
+```elixir
+elixir_code = CobolToElixir.convert!(cobol)
+IO.puts(elixir_code)
+```
+
+And finally, run that Elixir code and see that the output is the same as the COBOL output
+
+```elixir
+IO.puts("Elixir output:")
+execute_elixir.(elixir_code, ElixirFromCobol.Proceduretest)
+IO.puts("Cobol output:")
+IO.puts(cobol_output)
+```
