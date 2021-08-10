@@ -63,7 +63,7 @@ defmodule CobolToElixirCase do
         apply(module, :main, [])
       end)
 
-    :code.delete(module)
+    true = :code.delete(module)
     :code.purge(module)
 
     io
