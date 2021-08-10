@@ -20,6 +20,7 @@ defmodule CobolToElixir.Tokenizer do
   def tokenize_line("*>" <> comment), do: {:comment, String.trim_leading(comment, " ")}
   def tokenize_line("*" <> comment), do: {:comment, String.trim_leading(comment, " ")}
   def tokenize_line(">>SOURCE FORMAT FREE"), do: :source_format_free
+  def tokenize_line(~s|$ SET SOURCEFORMAT"FREE"|), do: :source_format_free
 
   def tokenize_line(line) do
     cond do
