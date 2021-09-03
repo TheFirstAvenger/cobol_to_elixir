@@ -29,6 +29,7 @@ defmodule CobolToElixir.Tokenizer do
       variable_line = match_variable_line(line) -> {:variable_line, variable_line}
       move_line = match_move_line(line) -> {:move_line, move_line}
       simple = match_simple(line) -> simple
+      complex = match_complex(String.split(line)) -> complex
       paragraph = match_paragraph(line) -> {:paragraph, paragraph}
       true -> {:not_tokenized, warn_not_tokenized(line)}
     end
@@ -94,13 +95,23 @@ defmodule CobolToElixir.Tokenizer do
   def match_move_line(_), do: false
 
   defp split_vars_and_strings(line) do
-    ~r([^"^\s]+|"[^"]*")
+    ~r("[^"]*"|'[^']*'|[^"\s]+)
     |> Regex.scan(line)
     |> List.flatten()
+    |> Enum.map(&single_quotes_to_double/1)
   end
+
+  defp single_quotes_to_double("'" <> rest) do
+    ~s|"#{String.trim_trailing(rest, "'")}"|
+  end
+
+  defp single_quotes_to_double(other), do: other
 
   def to_vars_and_strings(["\"" <> string | tail]),
     do: [{:string, String.trim_trailing(string, "\"")} | to_vars_and_strings(tail)]
+
+  def to_vars_and_strings(["'" <> string | tail]),
+    do: [{:string, String.trim_trailing(string, "'")} | to_vars_and_strings(tail)]
 
   def to_vars_and_strings([var | tail]), do: [{:variable, var} | to_vars_and_strings(tail)]
   def to_vars_and_strings([]), do: []
@@ -113,7 +124,21 @@ defmodule CobolToElixir.Tokenizer do
   defp match_simple("COMPUTE " <> compute), do: {:compute, compute}
   defp match_simple("PERFORM " <> perform), do: {:perform, parse_perform(perform)}
   defp match_simple("STOP RUN"), do: {:stop, :run}
+  defp match_simple("FILE-CONTROL"), do: :file_control
+  defp match_simple("ORGANIZATION IS LINE SEQUENTIAL"), do: {:organization, :line_sequential}
+  defp match_simple("ACCESS IS SEQUENTIAL"), do: {:access, :sequential}
+  defp match_simple("END-WRITE"), do: :end_write
   defp match_simple(_), do: false
+
+  defp match_complex(["FD", file_descriptor_name]), do: {:fd, file_descriptor_name}
+  defp match_complex(["OPEN", "OUTPUT", file_descriptor_name]), do: {:open, :output, file_descriptor_name}
+  defp match_complex(["WRITE", file_descriptor_name]), do: {:write, file_descriptor_name}
+  defp match_complex(["CLOSE", file_descriptor_name]), do: {:close, file_descriptor_name}
+
+  defp match_complex(["SELECT", file_var_name, "ASSIGN", "TO", file_name]),
+    do: {:select, file_var_name, :assign, :to, file_name}
+
+  defp match_complex(_), do: false
 
   defp parse_perform(perform) do
     case String.split(perform, " ") do

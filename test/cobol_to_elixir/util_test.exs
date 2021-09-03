@@ -16,7 +16,7 @@ defmodule CobolToElixir.UtilTest do
 
     validate_cobol_code(cobol)
 
-    assert CobolToElixir.Util.execute_cobol_code!(cobol) == "Hello World\n"
+    assert CobolToElixir.Util.execute_cobol_code!(cobol) == %{output: "Hello World\n", files: %{}}
   end
 
   test "execute_cobol_code!/2 raises on error" do

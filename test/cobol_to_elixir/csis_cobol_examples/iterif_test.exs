@@ -46,6 +46,6 @@ defmodule CobolToElixir.CSISCOBOLExamples.IterifTest do
     expected_output =
       "Enter First Number      : Enter Second Number     : Enter operator (+ or *) : Result is = 11\nEnter First Number      : Enter Second Number     : Enter operator (+ or *) : Result is = 11\nEnter First Number      : Enter Second Number     : Enter operator (+ or *) : Result is = 11\n"
 
-    assert_output_equal(cobol, ElixirFromCobol.Test1, expected_output, input)
+    assert_output_equal(cobol, ElixirFromCobol.Test1, output: expected_output, input: input)
   end
 end

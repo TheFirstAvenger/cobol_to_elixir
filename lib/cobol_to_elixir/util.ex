@@ -8,7 +8,9 @@ defmodule CobolToElixir.Util do
         {output, 1} -> raise "Error compiling cobol:\n#{output}"
       end
 
-      port = Port.open({:spawn, "#{tmp_folder}/cobol"}, [:binary, :exit_status, :stderr_to_stdout])
+      starting_files = File.ls!(tmp_folder)
+
+      port = Port.open({:spawn, "cobol"}, [{:cd, tmp_folder}, :binary, :exit_status, :stderr_to_stdout])
 
       send_cobol_input(port, input)
 
@@ -16,7 +18,11 @@ defmodule CobolToElixir.Util do
       # Port.close(port)
       output = get_cobol_output(port) |> Enum.reverse() |> Enum.join("")
       # {output, 0} = System.cmd("./#{tmp_folder}/cobol", [], stderr_to_stdout: true)
-      output
+      ending_files = File.ls!(tmp_folder)
+
+      new_files = get_new_files(starting_files, ending_files, tmp_folder)
+
+      %{output: output, files: new_files}
     after
       File.rm_rf!(tmp_folder)
     end
@@ -53,5 +59,14 @@ defmodule CobolToElixir.Util do
     :timer.sleep(timeout)
     Port.command(port, "#{input}\n")
     send_cobol_input(port, tail)
+  end
+
+  def get_new_files(starting_files, ending_files, tmp_folder) do
+    starting_files
+    |> Enum.reduce(ending_files, &List.delete(&2, &1))
+    |> Enum.map(fn file ->
+      {file, File.read!(Path.join(tmp_folder, file))}
+    end)
+    |> Enum.into(%{})
   end
 end

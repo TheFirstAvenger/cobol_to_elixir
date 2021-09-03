@@ -3,6 +3,8 @@ defmodule CobolToElixir.Parsed do
             author: nil,
             date_written: nil,
             divisions: [],
+            file_control: [],
+            file_variables: %{},
             procedure: [],
             paragraphs: %{},
             variables: [],

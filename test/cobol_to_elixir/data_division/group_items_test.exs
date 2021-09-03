@@ -129,7 +129,7 @@ defmodule CobolToElixir.DataDivision.GroupItemsTest do
 
     expected_output = "Customer: 042MIKEB01021982SSE\n"
 
-    assert_output_equal(cobol, ElixirFromCobol.Test1, expected_output)
+    assert_output_equal(cobol, ElixirFromCobol.Test1, output: expected_output)
   end
 
   test "renders a move into a map child" do
@@ -158,6 +158,6 @@ defmodule CobolToElixir.DataDivision.GroupItemsTest do
 
     expected_output = "Customer: 042MIKEB01021982SSE\nCustomer: 042JOHND01021945SSE\n"
 
-    assert_output_equal(cobol, ElixirFromCobol.Test1, expected_output)
+    assert_output_equal(cobol, ElixirFromCobol.Test1, output: expected_output)
   end
 end
