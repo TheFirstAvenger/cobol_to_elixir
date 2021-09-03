@@ -36,6 +36,6 @@ defmodule CobolToElixir.ProcedureDivision.ParagraphPerformTest do
     expected =
       "In Paragraph 1\nIn Paragraph 2\nIn Paragraph 3\nReturned to Paragraph 2\nReturned to Paragraph 1\nRepeat\n"
 
-    assert_output_equal(cobol, ElixirFromCobol.Proceduretest, expected)
+    assert_output_equal(cobol, ElixirFromCobol.Proceduretest, output: expected)
   end
 end

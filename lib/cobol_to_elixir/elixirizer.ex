@@ -6,6 +6,7 @@ defmodule CobolToElixir.Elixirizer do
 
   def elixirize(%Parsed{program_id: program_id} = parsed, opts \\ []) do
     namespace = Keyword.get(opts, :namespace, "ElixirFromCobol")
+    io_dir = Keyword.get(opts, :io_dir, "")
     accept_via_message = Keyword.get(opts, :accept_via_message, false)
     module_name = program_id_to_module_name(program_id)
 
@@ -16,6 +17,8 @@ defmodule CobolToElixir.Elixirizer do
         ~s|  author: #{parsed.author || "n/a"}|,
         ~s|  date written: #{parsed.date_written || "n/a"}|,
         ~s|  """|,
+        ~s||,
+        ~s|  @io_dir #{inspect(io_dir)}|,
         ~s||,
         ~s|  def main do|,
         ~s|    try do|,
@@ -43,7 +46,7 @@ defmodule CobolToElixir.Elixirizer do
           ~s/  def format(str, {:str, _, length}), do: str |> String.slice(0..(length - 1)) |> String.pad_trailing(length)/,
           ~s/  def format(int, {:int, _, length}), do: "\#{int}" |> String.slice(0..(length - 1)) |> String.pad_leading(length, "0")/,
           ~s||,
-          ~s|  def display_group_item(group_item, children_paths, pics) do|,
+          ~s|  def display_group_item(group_item = %{}, children_paths, pics) do|,
           ~s|    children_paths|,
           ~s/    |> Enum.reduce([], fn path, values ->/,
           ~s|      name = List.last(path)|,
@@ -138,7 +141,8 @@ defmodule CobolToElixir.Elixirizer do
   defp variable_name(%Variable{name: name}), do: variable_name(name)
   defp variable_name(name), do: "var_#{name}"
 
-  defp group_child_paths_name(%Variable{type: :map, name: name}), do: "child_paths_of_#{name}"
+  defp group_child_paths_name(%Variable{type: :map, name: name}), do: group_child_paths_name(name)
+  defp group_child_paths_name(name) when is_binary(name), do: "child_paths_of_#{name}"
 
   defp procedure_to_line({display_type, display}, %Parsed{} = parsed)
        when display_type in [:display_no_advancing, :display] do
@@ -193,6 +197,28 @@ defmodule CobolToElixir.Elixirizer do
 
   defp procedure_to_line({:perform, {:repeat, x, paragraph_name}}, _),
     do: List.duplicate(~s|    paragraph_#{paragraph_name}()|, x)
+
+  defp procedure_to_line({:open, :output, file_var_name}, %Parsed{} = parsed) do
+    %{file_name: file_name} = Enum.find(parsed.file_control, &(&1.var_name == file_var_name))
+    {file_variables, _file_variable_map} = parsed.file_variables[file_var_name]
+    [~s|    current_file = #{file_name}| | Enum.flat_map(file_variables, &variable_to_line/1)]
+  end
+
+  defp procedure_to_line({:write, variable}, _) do
+    [
+      ~s||,
+      ~s|    str_to_write = #{variable_name(variable)}|,
+      ~s/    |> display_group_item(#{group_child_paths_name(variable)}, pics)/,
+      ~s/    |> String.trim_trailing()/,
+      ~s/    |> Kernel.<>("\\n")/,
+      ~s||,
+      ~s|    File.write!(Path.join(@io_dir, current_file), str_to_write)|,
+      ~s||
+    ]
+  end
+
+  defp procedure_to_line(:end_write, _), do: []
+  defp procedure_to_line({:close, _}, _), do: [~s|    current_file = nil|]
 
   defp procedure_to_line(other, _) do
     # coveralls-ignore-start

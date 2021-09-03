@@ -105,16 +105,70 @@ defmodule CobolToElixir.Parser do
     %Parsed{parsed | procedure: Enum.reverse(procedure), paragraphs: paragraphs}
   end
 
-  defp parse_division(name, _contents, parsed) do
+  defp parse_division("ENVIRONMENT", environment, %Parsed{} = parsed) do
+    environment
+    |> parse_sections()
+    |> Enum.reduce(parsed, fn {name, section}, %Parsed{} = parsed ->
+      parse_environment_section(name, section, parsed)
+    end)
+  end
+
+  defp parse_division(name, _contents, %Parsed{} = parsed) do
     Logger.warn("No parser for division #{name}")
     parsed
   end
 
-  defp parse_data_section("WORKING-STORAGE", contents, parsed) do
+  defp parse_data_section("WORKING-STORAGE", contents, %Parsed{} = parsed) do
+    {variables, variable_map} = parse_variables(contents)
+    variable_map = Map.merge(parsed.variable_map || %{}, variable_map)
+    %Parsed{parsed | variables: variables, variable_map: variable_map}
+  end
+
+  defp parse_data_section("FILE", contents, %Parsed{} = parsed) do
+    file_variables = parse_individual_files(contents, nil, %{})
+
+    variable_map =
+      file_variables
+      |> Map.values()
+      |> Enum.map(&elem(&1, 1))
+      |> Enum.reduce(%{}, &Map.merge/2)
+      |> Map.merge(parsed.variable_map)
+
+    %Parsed{parsed | file_variables: file_variables, variable_map: variable_map}
+  end
+
+  defp parse_environment_section("INPUT-OUTPUT", contents, %Parsed{} = parsed) do
+    case hd(contents) do
+      :file_control ->
+        [{:select, file_var_name, :assign, :to, file_name} | tl] = tl(contents)
+
+        if tl != [{:organization, :line_sequential}, {:access, :sequential}] do
+          Logger.warn("file control options differ from assumed")
+        end
+
+        %Parsed{parsed | file_control: [%{var_name: file_var_name, file_name: file_name}]}
+    end
+  end
+
+  defp parse_individual_files([{:fd, file_name} | tl], _current_file_name, files),
+    do: parse_individual_files(tl, file_name, Map.put(files, file_name, []))
+
+  defp parse_individual_files([{:variable_line, _} = line | tl], current_file_name, files) do
+    files = Map.put(files, current_file_name, [line | files[current_file_name]])
+    parse_individual_files(tl, current_file_name, files)
+  end
+
+  defp parse_individual_files([], _, files) do
+    files
+    |> Enum.map(fn {name, lines} -> {name, lines |> Enum.reverse() |> parse_variables()} end)
+    |> Enum.into(%{})
+  end
+
+  defp parse_variables(contents) do
     {variable_lines, other} = Enum.split_with(contents, &(elem(&1, 0) == :variable_line))
 
     if other != [] do
-      Logger.warn("Unknown lines in WORKING-STORAGE: #{inspect(other)}")
+      Logger.warn("Unknown lines in variable section: #{inspect(other)}")
     end
 
     all_variables =
@@ -197,7 +251,7 @@ defmodule CobolToElixir.Parser do
         Map.put(variable_map, name, var)
       end)
 
-    %Parsed{parsed | variables: Enum.reverse(variables), variable_map: variable_map}
+    {Enum.reverse(variables), variable_map}
   end
 
   defp prune_depth_list([], _), do: []
@@ -289,7 +343,7 @@ defmodule CobolToElixir.Parser do
 
   defp parse_pic(pic) do
     pic =
-      case Regex.run(~r/^([9|X])\((\d)\)/, pic) do
+      case Regex.run(~r/^([9|X])\((\d+)\)/, pic) do
         [_, type, count] -> String.duplicate(type, String.to_integer(count))
         nil -> pic
       end

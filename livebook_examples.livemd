@@ -29,7 +29,7 @@ In this Livebook, we can install using `Mix.install`
   Mix.install([
     {:cobol_to_elixir,
      git: "git@github.com:TheFirstAvenger/cobol_to_elixir.git",
-     ref: "ad918c91b5b6cef054ad1489c871c6620896e42e"}
+     ref: "c1772939de25c175b6f4a5eb3fbd28f42a32c014"}
   ])
 ```
 
@@ -58,7 +58,7 @@ STOP RUN.
 Now, lets validate that this is correct COBOL by compiling and then executing it using `CobolToElixir.Util.execute_cobol_code!/2`
 
 ```elixir
-"Hello Mike\n" = cobol_output = CobolToElixir.Util.execute_cobol_code!(cobol)
+%{output: "Hello Mike\n"} = CobolToElixir.Util.execute_cobol_code!(cobol)
 ```
 
 Next, let's use `CobolToElixir.convert()` to convert the COBOL code to Elixir:
@@ -151,7 +151,7 @@ STOP RUN.
 Next, we execute that COBOL code to verify it is valid, and to determine the expected output
 
 ```elixir
-cobol_output = CobolToElixir.Util.execute_cobol_code!(cobol)
+%{output: cobol_output} = CobolToElixir.Util.execute_cobol_code!(cobol)
 IO.puts(cobol_output)
 ```
 

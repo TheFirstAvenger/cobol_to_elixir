@@ -58,14 +58,14 @@ defmodule CobolToElixirTest do
     input = [{1000, "John"}]
     expected_output = "Hello Mike \nHello John \nHello John "
     # First verify our cobol code runs and returns the right value
-    assert expected_output == execute_cobol_code!(cobol, input)
+    assert %{output: expected_output, files: %{}} == execute_cobol_code!(cobol, input)
     # Next run our converter to generate Elixir code
     assert {:ok, elixir_code} = CobolToElixir.convert(cobol, accept_via_message: true)
-    # Now run that Elixir code, and ensure the outtput matches our expected output
-    assert expected_output == execute_elixir_code(elixir_code, ElixirFromCobol.Test1, input)
+    # Now run that Elixir code, and ensure the output matches our expected output
+    assert %{output: expected_output, files: nil} == execute_elixir_code(elixir_code, ElixirFromCobol.Test1, input)
 
     # The below code is a one liner version of all of the above commands. Lets make sure that works too.
-    assert_output_equal(cobol, ElixirFromCobol.Test1, expected_output, input)
+    assert_output_equal(cobol, ElixirFromCobol.Test1, output: expected_output, input: input)
 
     # make sure validate_cobol_code raises on bad cobol
     assert_raise RuntimeError, ~r/^Error compiling cobol:/, fn -> validate_cobol_code("some bad code") end
