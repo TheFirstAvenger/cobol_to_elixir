@@ -29,7 +29,7 @@ In this Livebook, we can install using `Mix.install`
   Mix.install([
     {:cobol_to_elixir,
      git: "git@github.com:TheFirstAvenger/cobol_to_elixir.git",
-     ref: "c1772939de25c175b6f4a5eb3fbd28f42a32c014"}
+     ref: "dc082c1e22ed06019fa1da777f53658cf81f0b3b"}
   ])
 ```
 
